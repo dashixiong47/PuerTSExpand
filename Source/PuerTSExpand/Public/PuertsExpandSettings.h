@@ -22,4 +22,8 @@ public:
 	/** 自动Import 文件名称 */
 	UPROPERTY(EditAnywhere, Config, Category="PuertsExpand")
 	FString AutoImportFileName = TEXT("MainGame.ts");
+
+	// 启动Node命令
+	UPROPERTY(EditAnywhere, Config, Category="PuertsExpand")
+	FString NpmDevCommand = TEXT("/c npm run dev");
 };

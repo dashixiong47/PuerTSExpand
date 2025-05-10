@@ -40,7 +40,7 @@ public class PuerTSExpand : ModuleRules
 				"Slate",
 				"SlateCore",
 				"UMGEditor",
-				"Projects"
+				"Projects", "DeclarationGenerator"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

@@ -2,7 +2,10 @@
 
 #include "PuerTSExpand.h"
 
+#include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
+#include "IAssetTools.h"
+#include "IDeclarationGenerator.h"
 #include "ISettingsModule.h"
 #include "PuertsExpandSettings.h"
 #include "PuerTSExpandStruct.h"
@@ -21,13 +24,22 @@ void FPuerTSExpandModule::StartupModule()
 		                                           "Settings for Puerts Expand Plugin."),
 		                                 GetMutableDefault<UPuertsExpandSettings>());
 	}
+	
 	AddContentBrowserContextMenuExtender();
+	StartNpmDev();
+	
+	
+	// FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
+	// AssetToolsModule.Get().OnAssetPostRename().AddRaw(this, &FPuerTSExpandModule::OnAssetPostRename);
 }
 
 void FPuerTSExpandModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
+	if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
+	{
+		FAssetToolsModule& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>("AssetTools");
+		AssetToolsModule.Get().OnAssetPostRename().RemoveAll(this);
+	}
 }
 
 void FPuerTSExpandModule::AddContentBrowserContextMenuExtender()
@@ -50,13 +62,17 @@ TSharedRef<FExtender> FPuerTSExpandModule::OnExtendContentBrowserAssetSelectionM
 		"CommonAssetActions",
 		EExtensionHook::After,
 		nullptr,
-		FMenuExtensionDelegate::CreateStatic(&GenerateMixinTemplate, SelectedAssets)
+		FMenuExtensionDelegate::CreateStatic(&AddExpandButton, SelectedAssets)
 	);
 	return Extender;
 }
 
-void FPuerTSExpandModule::GenerateMixinTemplate(FMenuBuilder& MenuBuilder, const TArray<FAssetData> SelectedAssets)
+void FPuerTSExpandModule::AddExpandButton(FMenuBuilder& MenuBuilder, const TArray<FAssetData> SelectedAssets)
 {
+	// 先调用PuerTS生成TS类
+	IDeclarationGenerator& Generator = IDeclarationGenerator::Get();
+	Generator.GenTypeScriptDeclaration(false, NAME_None);
+	
 	bool bIShow = true;
 	for (const FAssetData& Asset : SelectedAssets)
 	{
@@ -238,9 +254,12 @@ FGenerateStatus FPuerTSExpandModule::DeleteMixinFileFromAsset(const FAssetData& 
 
 	// 构造 Mixin 文件路径
 	FString Path = GetDefault<UPuertsExpandSettings>()->OutputPath;
+	
 	FString OutputDir = FPaths::Combine(FPaths::ProjectDir(), Path, AssetPath);
+	FString OutputJSDir = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("JavaScript"), AssetPath);
 	
 	FString OutputPath = FPaths::Combine(OutputDir, FileName + TEXT(".ts"));
+	FString OutputJSPath = FPaths::Combine(OutputJSDir, FileName + TEXT(".js"));
 
 	// 构造 import 文件路径
 	FString AutoImportFileName = GetDefault<UPuertsExpandSettings>()->AutoImportFileName;
@@ -253,12 +272,17 @@ FGenerateStatus FPuerTSExpandModule::DeleteMixinFileFromAsset(const FAssetData& 
 	// 删除 Mixin 文件
 	if (IFileManager::Get().FileExists(*OutputPath))
 	{
+		// 删除TS文件和JS文件和map文件
+		IFileManager::Get().Delete(*(OutputJSPath+TEXT(".map")));
+		IFileManager::Get().Delete(*OutputJSPath);
+	
 		if (!IFileManager::Get().Delete(*OutputPath))
 		{
 			Status.Status = EGenerateStatus::Failed;
 			Status.Message = FString::Printf(TEXT("删除失败: %s"), *OutputPath);
 			return Status;
 		}
+		
 	}
 	else
 	{
@@ -363,6 +387,77 @@ FString FPuerTSExpandModule::SanitizeNumericPathSegments(const FString& Path)
 
 	// 重新组合路径（加上开头的 "/"）
 	return TEXT("/") + FString::Join(PathSegments, TEXT("/"));
+}
+
+void FPuerTSExpandModule::OnAssetPostRename(const TArray<FAssetRenameData>& RenameDataList)
+{
+	// 遍历重命名数据列表
+	for (const FAssetRenameData& RenameData : RenameDataList)
+	{
+		// 获取旧路径
+		FString OldPath = RenameData.OldObjectPath.GetAssetName();
+
+		// 获取旧的文件名（没有扩展名的名称）
+		FString OldName = RenameData.OldObjectPath.ToString(); //获取不到 先不做重命名更新
+
+		// 获取新路径和新名称
+		FString NewPath = RenameData.Asset->GetPathName();
+		FString NewName = RenameData.NewName;
+
+		UE_LOG(LogTemp, Log, TEXT("资源重命名："));
+		UE_LOG(LogTemp, Log, TEXT("旧路径：%s"), *OldPath);
+		UE_LOG(LogTemp, Log, TEXT("旧资源名称：%s"), *OldName);
+		UE_LOG(LogTemp, Log, TEXT("新路径：%s"), *NewPath);
+		UE_LOG(LogTemp, Log, TEXT("新资源名称：%s"), *NewName);
+
+	}
+}
+
+void FPuerTSExpandModule::StartNpmDev()
+{
+	FString NpmDevCommand=GetDefault<UPuertsExpandSettings>()->NpmDevCommand;
+	if(NpmDevCommand==TEXT(""))
+	{
+		return;
+	}
+	const FString Command = TEXT("cmd.exe");
+	const FString Params = NpmDevCommand;
+	const FString WorkingDir = FPaths::ProjectDir();
+
+	NpmDevProcessHandle = FPlatformProcess::CreateProc(
+		*Command,
+		*Params,
+		true,   // Detached
+		false,  // Hidden
+		false,  // ReallyHidden
+		nullptr,
+		0,
+		*WorkingDir,
+		nullptr
+	);
+
+	if (NpmDevProcessHandle.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("npm run dev 启动成功"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("启动失败"));
+	}
+}
+
+void FPuerTSExpandModule::StopNpmDev()
+{
+	if (NpmDevProcessHandle.IsValid())
+	{
+		FPlatformProcess::TerminateProc(NpmDevProcessHandle, true);
+		NpmDevProcessHandle.Reset();
+		UE_LOG(LogTemp, Log, TEXT("npm run dev 已停止"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("没有正在运行的 npm 进程"));
+	}
 }
 
 #undef LOCTEXT_NAMESPACE
