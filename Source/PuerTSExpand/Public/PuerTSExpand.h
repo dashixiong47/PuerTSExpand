@@ -42,6 +42,6 @@ protected:
 
 	// 命令行运行Node
 	
-	void StartNpmDev();
-	void StopNpmDev();
+	void StartNodeCommand();
+	void StopNodeCommand();
 };

@@ -25,5 +25,5 @@ public:
 
 	// 启动Node命令
 	UPROPERTY(EditAnywhere, Config, Category="PuertsExpand")
-	FString NpmDevCommand = TEXT("/c npm run dev");
+	FString NodeCommand = TEXT("/c npm run dev");
 };

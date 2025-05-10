@@ -24,11 +24,11 @@ void FPuerTSExpandModule::StartupModule()
 		                                           "Settings for Puerts Expand Plugin."),
 		                                 GetMutableDefault<UPuertsExpandSettings>());
 	}
-	
+
 	AddContentBrowserContextMenuExtender();
-	StartNpmDev();
-	
-	
+	StartNodeCommand();
+
+
 	// FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
 	// AssetToolsModule.Get().OnAssetPostRename().AddRaw(this, &FPuerTSExpandModule::OnAssetPostRename);
 }
@@ -69,10 +69,6 @@ TSharedRef<FExtender> FPuerTSExpandModule::OnExtendContentBrowserAssetSelectionM
 
 void FPuerTSExpandModule::AddExpandButton(FMenuBuilder& MenuBuilder, const TArray<FAssetData> SelectedAssets)
 {
-	// 先调用PuerTS生成TS类
-	IDeclarationGenerator& Generator = IDeclarationGenerator::Get();
-	Generator.GenTypeScriptDeclaration(false, NAME_None);
-	
 	bool bIShow = true;
 	for (const FAssetData& Asset : SelectedAssets)
 	{
@@ -96,6 +92,10 @@ void FPuerTSExpandModule::AddExpandButton(FMenuBuilder& MenuBuilder, const TArra
 			FSlateIcon(),
 			FUIAction(FExecuteAction::CreateLambda([SelectedAssets]()
 			{
+				// 先调用PuerTS生成TS类
+				IDeclarationGenerator& Generator = IDeclarationGenerator::Get();
+				Generator.GenTypeScriptDeclaration(false, NAME_None);
+
 				FString SuccessTips = TEXT("生成Mixin模板成功:\n");
 				FString FailedTips = TEXT("生成Mixin模板失败:\n");
 				FString WarningTips = TEXT("警告:\n");
@@ -108,7 +108,8 @@ void FPuerTSExpandModule::AddExpandButton(FMenuBuilder& MenuBuilder, const TArra
 					FString AssetPath = Asset.PackagePath.ToString(); // 例如 "/Game/MyCharacterBP"
 
 					// 完整虚拟路径（含资源名，不含扩展名）
-					FString FullObjectPath = Asset.GetObjectPathString(); // 例如 "/Game/Characters/MyCharacterBP.MyCharacterBP"
+					FString FullObjectPath = Asset.GetObjectPathString();
+					// 例如 "/Game/Characters/MyCharacterBP.MyCharacterBP"
 
 					TMap<FString, FString> Replacements;
 					Replacements.Add(TEXT("<AssetName>"), AssetName);
@@ -232,7 +233,7 @@ FGenerateStatus FPuerTSExpandModule::GenerateMixinFileFromTemplate(const TMap<FS
 	{
 		// 自动导入文件路径
 		AddImportStatementIfNotExists(FilePath + FileName);
-		
+
 		Status.Status = EGenerateStatus::Success;
 		Status.Message = FString::Printf(TEXT("Mixin 文件已生成: %s"), *OutputPath);
 		return Status;
@@ -244,6 +245,7 @@ FGenerateStatus FPuerTSExpandModule::GenerateMixinFileFromTemplate(const TMap<FS
 		return Status;
 	}
 }
+
 FGenerateStatus FPuerTSExpandModule::DeleteMixinFileFromAsset(const FAssetData& Asset)
 {
 	FGenerateStatus Status;
@@ -254,10 +256,10 @@ FGenerateStatus FPuerTSExpandModule::DeleteMixinFileFromAsset(const FAssetData& 
 
 	// 构造 Mixin 文件路径
 	FString Path = GetDefault<UPuertsExpandSettings>()->OutputPath;
-	
+
 	FString OutputDir = FPaths::Combine(FPaths::ProjectDir(), Path, AssetPath);
 	FString OutputJSDir = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("JavaScript"), AssetPath);
-	
+
 	FString OutputPath = FPaths::Combine(OutputDir, FileName + TEXT(".ts"));
 	FString OutputJSPath = FPaths::Combine(OutputJSDir, FileName + TEXT(".js"));
 
@@ -273,16 +275,15 @@ FGenerateStatus FPuerTSExpandModule::DeleteMixinFileFromAsset(const FAssetData& 
 	if (IFileManager::Get().FileExists(*OutputPath))
 	{
 		// 删除TS文件和JS文件和map文件
-		IFileManager::Get().Delete(*(OutputJSPath+TEXT(".map")));
+		IFileManager::Get().Delete(*(OutputJSPath + TEXT(".map")));
 		IFileManager::Get().Delete(*OutputJSPath);
-	
+
 		if (!IFileManager::Get().Delete(*OutputPath))
 		{
 			Status.Status = EGenerateStatus::Failed;
 			Status.Message = FString::Printf(TEXT("删除失败: %s"), *OutputPath);
 			return Status;
 		}
-		
 	}
 	else
 	{
@@ -327,13 +328,15 @@ void FPuerTSExpandModule::AddImportStatementIfNotExists(const FString& RelativeI
 			FileContent += FString::Printf(TEXT("\n%s"), *ImportLine);
 			FFileHelper::SaveStringToFile(FileContent, *FullFilePath);
 		}
-	}else
+	}
+	else
 	{
 		// 如果文件不存在，则创建一个新的文件并写入 import 语句
 		FString NewContent = FString::Printf(TEXT("import '.%s';"), *RelativeImportPath);
 		FFileHelper::SaveStringToFile(NewContent, *FullFilePath);
 	}
 }
+
 void FPuerTSExpandModule::RemoveImportStatementIfExists(const FString& RelativeImportPath)
 {
 	FString Path = GetDefault<UPuertsExpandSettings>()->OutputPath;
@@ -344,11 +347,12 @@ void FPuerTSExpandModule::RemoveImportStatementIfExists(const FString& RelativeI
 	if (FFileHelper::LoadFileToString(FileContent, *FullFilePath))
 	{
 		FString ImportLine = FString::Printf(TEXT("import '.%s';"), *RelativeImportPath);
-		
+
 		// 尝试逐行过滤掉目标 import 行
 		TArray<FString> Lines;
 		FileContent.ParseIntoArrayLines(Lines);
-		Lines.RemoveAll([&](const FString& Line) {
+		Lines.RemoveAll([&](const FString& Line)
+		{
 			return Line.TrimStartAndEnd().Equals(ImportLine);
 		});
 
@@ -409,27 +413,26 @@ void FPuerTSExpandModule::OnAssetPostRename(const TArray<FAssetRenameData>& Rena
 		UE_LOG(LogTemp, Log, TEXT("旧资源名称：%s"), *OldName);
 		UE_LOG(LogTemp, Log, TEXT("新路径：%s"), *NewPath);
 		UE_LOG(LogTemp, Log, TEXT("新资源名称：%s"), *NewName);
-
 	}
 }
 
-void FPuerTSExpandModule::StartNpmDev()
+void FPuerTSExpandModule::StartNodeCommand()
 {
-	FString NpmDevCommand=GetDefault<UPuertsExpandSettings>()->NpmDevCommand;
-	if(NpmDevCommand==TEXT(""))
+	FString NodeCommand = GetDefault<UPuertsExpandSettings>()->NodeCommand;
+	if (NodeCommand == TEXT(""))
 	{
 		return;
 	}
 	const FString Command = TEXT("cmd.exe");
-	const FString Params = NpmDevCommand;
+	const FString Params = NodeCommand;
 	const FString WorkingDir = FPaths::ProjectDir();
 
 	NpmDevProcessHandle = FPlatformProcess::CreateProc(
 		*Command,
 		*Params,
-		true,   // Detached
-		false,  // Hidden
-		false,  // ReallyHidden
+		true, // Detached
+		false, // Hidden
+		false, // ReallyHidden
 		nullptr,
 		0,
 		*WorkingDir,
@@ -446,7 +449,7 @@ void FPuerTSExpandModule::StartNpmDev()
 	}
 }
 
-void FPuerTSExpandModule::StopNpmDev()
+void FPuerTSExpandModule::StopNodeCommand()
 {
 	if (NpmDevProcessHandle.IsValid())
 	{
