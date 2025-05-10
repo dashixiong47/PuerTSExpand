@@ -89,22 +89,21 @@ void FPuerTSExpandModule::GenerateMixinTemplate(FMenuBuilder& MenuBuilder, const
 					FString AssetName = Asset.AssetName.ToString(); // 例如 "MyCharacterBP"
 
 					// 虚拟路径（不含资源名）
-					FString AssetPath = Asset.PackagePath.ToString(); // 例如 "/Game/Characters"
+					FString AssetPath = Asset.PackagePath.ToString(); // 例如 "/Game/MyCharacterBP"
 
 					// 完整虚拟路径（含资源名，不含扩展名）
-					FString FullObjectPath = Asset.GetObjectPathString();
-					// 例如 "/Game/Characters/MyCharacterBP.MyCharacterBP"
+					FString FullObjectPath = Asset.GetObjectPathString(); // 例如 "/Game/Characters/MyCharacterBP.MyCharacterBP"
 
 					TMap<FString, FString> Replacements;
 					Replacements.Add(TEXT("<AssetName>"), AssetName);
 					Replacements.Add(TEXT("<AssetPath>"), AssetPath);
 					Replacements.Add(TEXT("<FullObjectPath>"), FullObjectPath);
-					FString AssetTypes = FullObjectPath.Replace(TEXT("/"), TEXT("."));
+					FString ProcessedPath = SanitizeNumericPathSegments(FullObjectPath);
+					FString AssetTypes = ProcessedPath.Replace(TEXT("/"), TEXT("."));
 					Replacements.Add(TEXT("<AssetTypes>"), FString::Printf(TEXT("UE%s_C"), *AssetTypes));
 					FString NewFilePath = AssetPath.Replace(TEXT("/Game"), TEXT(""));
 					FGenerateStatus CallbackStatus = FPuerTSExpandModule::GenerateMixinFileFromTemplate(
 						Replacements, NewFilePath,TEXT("/") + AssetName);
-					// Tips=FString::Printf( TEXT("%s\n%s"), *Tips, *Tip);
 					if (CallbackStatus.Status == EGenerateStatus::Success)
 					{
 						SuccessTips += CallbackStatus.Message + TEXT("\n");
@@ -240,6 +239,7 @@ FGenerateStatus FPuerTSExpandModule::DeleteMixinFileFromAsset(const FAssetData& 
 	// 构造 Mixin 文件路径
 	FString Path = GetDefault<UPuertsExpandSettings>()->OutputPath;
 	FString OutputDir = FPaths::Combine(FPaths::ProjectDir(), Path, AssetPath);
+	
 	FString OutputPath = FPaths::Combine(OutputDir, FileName + TEXT(".ts"));
 
 	// 构造 import 文件路径
@@ -332,6 +332,37 @@ void FPuerTSExpandModule::RemoveImportStatementIfExists(const FString& RelativeI
 		FString NewContent = FString::Join(Lines, TEXT("\n"));
 		FFileHelper::SaveStringToFile(NewContent, *FullFilePath);
 	}
+}
+
+FString FPuerTSExpandModule::SanitizeNumericPathSegments(const FString& Path)
+{
+	auto IsNumericOnly = [](const FString& Str) -> bool
+	{
+		for (TCHAR Char : Str)
+		{
+			if (!FChar::IsDigit(Char))
+			{
+				return false;
+			}
+		}
+		return Str.Len() > 0;
+	};
+
+	// 拆分路径
+	TArray<FString> PathSegments;
+	Path.ParseIntoArray(PathSegments, TEXT("/"), true);
+
+	// 处理纯数字段
+	for (FString& Segment : PathSegments)
+	{
+		if (IsNumericOnly(Segment))
+		{
+			Segment = TEXT("_") + Segment;
+		}
+	}
+
+	// 重新组合路径（加上开头的 "/"）
+	return TEXT("/") + FString::Join(PathSegments, TEXT("/"));
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -22,4 +22,6 @@ protected:
 	static FGenerateStatus DeleteMixinFileFromAsset(const FAssetData& Asset);
 	static void AddImportStatementIfNotExists(const FString& RelativeImportPath);
 	static void RemoveImportStatementIfExists(const FString& RelativeImportPath);
+	// 将路径中纯数字的段加前缀 "_"
+	static  FString SanitizeNumericPathSegments(const FString& Path);
 };
