@@ -17,7 +17,7 @@ public:
 
 	/** 输出路径 */
 	UPROPERTY(EditAnywhere, Config, Category="PuertsExpand")
-	FString OutputPath = TEXT("/TypeScript");
+	FString OutputPath = TEXT("TypeScript");
 
 	/** 自动Import 文件名称 */
 	UPROPERTY(EditAnywhere, Config, Category="PuertsExpand")

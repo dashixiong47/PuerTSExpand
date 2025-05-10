@@ -100,7 +100,7 @@ void FPuerTSExpandModule::GenerateMixinTemplate(FMenuBuilder& MenuBuilder, const
 					Replacements.Add(TEXT("<AssetPath>"), AssetPath);
 					Replacements.Add(TEXT("<FullObjectPath>"), FullObjectPath);
 					FString AssetTypes = FullObjectPath.Replace(TEXT("/"), TEXT("."));
-					Replacements.Add(TEXT("<AssetTypes>"), AssetTypes);
+					Replacements.Add(TEXT("<AssetTypes>"), FString::Printf(TEXT("UE%s_C"), *AssetTypes));
 					FString NewFilePath = AssetPath.Replace(TEXT("/Game"), TEXT(""));
 					FGenerateStatus CallbackStatus = FPuerTSExpandModule::GenerateMixinFileFromTemplate(
 						Replacements, NewFilePath,TEXT("/") + AssetName);
@@ -303,6 +303,11 @@ void FPuerTSExpandModule::AddImportStatementIfNotExists(const FString& RelativeI
 			FileContent += FString::Printf(TEXT("\n%s"), *ImportLine);
 			FFileHelper::SaveStringToFile(FileContent, *FullFilePath);
 		}
+	}else
+	{
+		// 如果文件不存在，则创建一个新的文件并写入 import 语句
+		FString NewContent = FString::Printf(TEXT("import '.%s';"), *RelativeImportPath);
+		FFileHelper::SaveStringToFile(NewContent, *FullFilePath);
 	}
 }
 void FPuerTSExpandModule::RemoveImportStatementIfExists(const FString& RelativeImportPath)

@@ -26,7 +26,7 @@ public class PuerTSExpand : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core", "JsEnv",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
