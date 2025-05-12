@@ -35,11 +35,12 @@ void FPuerTSExpandModule::StartupModule()
 
 void FPuerTSExpandModule::ShutdownModule()
 {
-	if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
-	{
-		FAssetToolsModule& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>("AssetTools");
-		AssetToolsModule.Get().OnAssetPostRename().RemoveAll(this);
-	}
+	StopNodeCommand();
+	// if (FModuleManager::Get().IsModuleLoaded("AssetTools"))
+	// {
+	// 	FAssetToolsModule& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>("AssetTools");
+	// 	AssetToolsModule.Get().OnAssetPostRename().RemoveAll(this);
+	// }
 }
 
 void FPuerTSExpandModule::AddContentBrowserContextMenuExtender()
